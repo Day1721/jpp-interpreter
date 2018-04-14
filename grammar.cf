@@ -1,0 +1,84 @@
+entrypoints Program ;
+
+
+Prog.       Program ::= [Stmt] ;
+
+
+SLet.       Stmt ::= "let" Pattern "=" Expr ";" ;
+SLetMut.    Stmt ::= "let" "mut" Pattern "=" Expr ";" ;
+SLetT.      Stmt ::= "let" Pattern ":" Type "=" Expr ";";
+SLetMutT.   Stmt ::= "let" "mut" Pattern ":" Type "=" Expr ";" ;
+SIf.        Stmt ::= "if" "(" Expr ")" Stmt ;
+SIfEls.     Stmt ::= "if" "(" Expr ")" Stmt "else" Stmt ;
+SWhile.     Stmt ::= "while" "(" Expr ")" Stmt ;
+SFor.       Stmt ::= "for" "(" Ident "=" Expr "to" Expr ")" Stmt ;
+SBlock.     Stmt ::= Block ;
+SRet.       Stmt ::= "return" Expr ";" ;
+SRetV.      Stmt ::= "return" ";" ;
+SExpr.      Stmt ::= Expr ";" ;
+SSkip.      Stmt ::= ";" ;
+
+terminator  Stmt "" ;
+
+
+Block.      Block ::= "{" [Stmt] "}" ;
+
+
+EFunc.      Expr1 ::= "\\" Pattern "=>" Block ;
+EFuncE.     Expr1 ::= "\\" Pattern "=>" Expr ;
+ETuple.     Expr1 ::= Tuple ;
+EOr.        Expr2 ::= Expr2 "||" Expr3 ;
+EAnd.       Expr3 ::= Expr3 "&&" Expr4 ;
+ERel.       Expr4 ::= Expr4 RelOp Expr5 ;
+EAdd.       Expr5 ::= Expr6 AddOp Expr5 ;
+EMul.       Expr6 ::= Expr7 MulOp Expr6 ;
+EPow.       Expr7 ::= Expr8 PowOp Expr7 ;
+ENeg.       Expr8 ::= "!" Expr9 ;
+EVar.       Expr9 ::= Ident ;
+EInt.       Expr9 ::= Integer ;
+EStr.       Expr9 ::= String ;
+ETrue.      Expr9 ::= "true" ;
+EFalse.     Expr9 ::= "false" ;
+ECall.      Expr9 ::= Expr9 "(" [Expr] ")" ;
+
+separator   Expr "," ;
+coercions   Expr 9 ;
+
+
+OPlus.      AddOp ::= "+" ;
+OMinus.     AddOp ::= "-" ;
+OMult.      MulOp ::= "*" ;
+ODiv.       MulOp ::= "/" ;
+OMod.       MulOp ::= "%" ;
+OPow.       PowOp ::= "^" ;
+OLT.        RelOp ::= "<" ;
+OLE.        RelOp ::= "<=" ;
+OGT.        RelOp ::= ">" ;
+OGE.        RelOp ::= ">=" ;
+OEq.        RelOp ::= "=" ;
+ONEq.       RelOp ::= "!=" ;
+
+
+TMany.      Tuple ::= "(" Expr "," [Expr] ")" ;
+
+
+TInt.       Type2 ::= "int" ;
+TBool.      Type2 ::= "bool" ;
+TStr.       Type2 ::= "str" ;
+TVoid.      Type2 ::= "()" ;
+TTuple.     Type2 ::= "(" Type "," [Type] ")" ;
+TVar.       Type2 ::= Ident ;
+TFunc.      Type  ::= Type2 "->" Type ;
+coercions   Type 2 ;
+
+separator Type "," ;
+
+
+PVar.       Pattern ::= Ident ;
+PList.      Pattern ::= "(" [Pattern] ")" ;
+PIgnore.    Pattern ::= "_" ;
+
+separator   Pattern "," ;
+
+comment     "//" ;
+comment     "/*" "*/" ;

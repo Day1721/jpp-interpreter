@@ -1,0 +1,48 @@
+// Types
+let i : int = 42;                   // Integers
+let is : bool = i > 0;              // Booleans
+let hello : str = "Hello World!"    // Strings
+let tuple : (int,int) = (i,i+1);    // Tuples
+let add : int->int = fun x => x+1;  // Functions
+let id : a->a = fun x => x;         // Polymorphic functions
+let something = id(i);              // Type annotation are optional
+let compose /*: (b->c,a->b)->(a->c) */ 
+    = fun (f,g) => fun x => f(g(x));// More complex example
+
+
+// I/O handling
+print(hello);               // Print string on screen
+readc(char);                // Reads char from input, stores in "new" var {char}, returns bool
+readl(line);                // Reads line from input and stores in "new" var {line}, returns bool
+
+// Some statemens
+if (i > 0) id(i);                   // If
+if (i > 0) id(i) else id(i+1);      // If else
+while (readc(c)) {                  // While
+    print(strConcat("Saw ", c));
+}
+for (i = 0 to 10) print(itos(i));   // For
+
+let asInt : int = stoi("1");        // String to int
+let asStr : str = itos(1);          // Int to string
+
+let fib = fun n => {                // recursion
+    if (n < 2) return 1;
+    return fib(n-1) + fib(n-2);
+}
+
+let sqr5 = (fun n => n*n)(5);       // call inline lambda
+
+let (fst,snd) = t;                  // tuple unpacking
+let triple = (1,2,3);
+let (fst,_,_) = triple;             // some may be ignored
+
+//features:
+//  - types: int | bool | string | tuple | function
+//  - if, if-else, for, while
+//  - lambdas
+//  - recursion for all types
+//  - string to int, int to string
+//  - I/O handling (print, readc, readl)
+//  - Dynamic errors handling
+//  - function as arguments/return values
