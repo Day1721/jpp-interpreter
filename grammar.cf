@@ -5,9 +5,7 @@ Prog.       Program ::= [Stmt] ;
 
 
 SLet.       Stmt ::= "let" Pattern "=" Expr ";" ;
-SLetMut.    Stmt ::= "let" "mut" Pattern "=" Expr ";" ;
 SLetT.      Stmt ::= "let" Pattern ":" Type "=" Expr ";";
-SLetMutT.   Stmt ::= "let" "mut" Pattern ":" Type "=" Expr ";" ;
 SIf.        Stmt ::= "if" "(" Expr ")" Stmt ;
 SIfEls.     Stmt ::= "if" "(" Expr ")" Stmt "else" Stmt ;
 SWhile.     Stmt ::= "while" "(" Expr ")" Stmt ;
