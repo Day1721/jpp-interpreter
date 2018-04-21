@@ -18,3 +18,11 @@ cabal.sandbox.config
 .stack-work/
 cabal.project.local
 .HTF/
+
+#bnfc
+*.x
+*.o
+*.y
+
+#vim
+*.swp
