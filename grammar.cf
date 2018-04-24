@@ -19,7 +19,7 @@ SSkip.      Stmt ::= ";" ;
 terminator  Stmt "" ;
 
 
-Block.      Block ::= "{" [Stmt] "}" ;
+BBlock.     Block ::= "{" [Stmt] "}" ;
 
 
 EFunc.      Expr1 ::= "\\" Pattern "=>" Block ;
@@ -28,8 +28,8 @@ ETuple.     Expr1 ::= Tuple ;
 EOr.        Expr2 ::= Expr2 "||" Expr3 ;
 EAnd.       Expr3 ::= Expr3 "&&" Expr4 ;
 ERel.       Expr4 ::= Expr4 RelOp Expr5 ;
-EAdd.       Expr5 ::= Expr6 AddOp Expr5 ;
-EMul.       Expr6 ::= Expr7 MulOp Expr6 ;
+EAdd.       Expr5 ::= Expr5 AddOp Expr6 ;
+EMul.       Expr6 ::= Expr6 MulOp Expr7 ;
 EPow.       Expr7 ::= Expr8 PowOp Expr7 ;
 ENeg.       Expr8 ::= "!" Expr9 ;
 EVar.       Expr9 ::= Ident ;
