@@ -1,0 +1,10 @@
+all: interpreter
+
+
+interpreter: grammar
+	ghc -dynamic --make Program -o interpreter
+
+grammar:
+	bnfc --haskell grammar.cf
+
+

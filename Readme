@@ -1,0 +1,9 @@
+Alpha version of JPP-Interpreter of z-lang
+
+Building:
+make
+
+New (updated, removed most of conflicts) grammar can be found in file "grammar.cf".
+
+Current version still don't work well, mostly because Type Checker still lacks 
+polymorphism and type interference handling. In next version I'll fix this.
