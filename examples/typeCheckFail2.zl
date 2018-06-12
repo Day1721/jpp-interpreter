@@ -1,0 +1,7 @@
+let id = \x => x;
+
+let id2 = id(id); //Ok here
+
+let fst = \(x,y) => x;
+
+let x = fst(id);

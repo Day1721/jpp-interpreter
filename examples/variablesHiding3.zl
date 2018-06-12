@@ -1,0 +1,7 @@
+let i = 5;
+
+let printI = \( ) => print(itos(i));
+
+let i = 8;
+
+printI( );

@@ -1,0 +1,18 @@
+let printer = \(key,result) => {
+    print(key);
+    print(": ");
+    print(itos(result));
+    print("\n");
+};
+
+let i = 6;
+let j = 7;
+
+printer("Addition", i+j);
+printer("Subtraction", i-j);
+printer("Multiplication", i*j);
+printer("Division", i/j);
+printer("Exponantiation", i^j);
+printer("Modulo", i%j);
+
+printer("Complex", (1+2)^2*7/3*2);

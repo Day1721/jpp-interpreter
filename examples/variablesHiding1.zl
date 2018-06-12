@@ -1,0 +1,13 @@
+let i = 1;
+
+print(itos(i));
+print("\n");
+
+{
+    let i = 2;
+    print(itos(i));
+    print("\n");
+}
+
+print(itos(i));
+print("\n");

@@ -1,0 +1,26 @@
+let x = 42;
+
+if (x < 22) {
+    print("IS");
+} else {
+    print("NOT");
+}
+print("\n");
+
+let isLoop = false;
+
+//while either loops forever or ends instantly
+while (isLoop) {
+    print("LOOPING...\n");
+}
+
+let getValue = \( ) => {
+    print("getting\n");
+    return 10;
+};
+
+for (i = 1 to getValue( )) {
+    print("Value of i = ");
+    print(itos(i));
+    print("\n");
+}

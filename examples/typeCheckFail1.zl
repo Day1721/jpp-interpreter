@@ -1,0 +1,6 @@
+let strr = "not int";
+
+let add1 = \x => x+1;
+
+let res = add1(strr);
+print(res);

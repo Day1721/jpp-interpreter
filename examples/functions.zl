@@ -1,0 +1,29 @@
+let printer = \i => print(itos(i)); // expression-bodied procedure
+let valGetter = \( ) => 42;         // expression-bodied function
+
+let printer2 = \i => {              // regular procedure
+    print(itos(i));
+    print("\n");
+};
+
+let id = \x => x;                   // polymorphic function
+
+let id2 = id(\x => x);              // lambda usage example
+
+let compose = \(f,g) => \x => f(g(x));  // functions as params and result
+let id3 = compose(id2,id2); 
+
+let getGetterFunc = \( ) => {
+    let i = 55;
+    return \( ) => i;
+};
+
+print(itos(getGetterFunc( )( )));
+print("\n");
+
+let factorial = \n => {
+    if (n < 2) return 1;
+    else return n * factorial(n-1);
+};
+
+print(itos(factorial(6)));
