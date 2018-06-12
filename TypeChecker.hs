@@ -1,5 +1,7 @@
 {-#LANGUAGE LambdaCase#-}
 
+--TODO : deepLift on show
+
 module TypeChecker where
 
 import qualified AbsGrammar as AG
@@ -7,6 +9,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.List as List
 import Data.Maybe
+
+import Debug.Trace
 
 import Control.Monad
 import Control.Monad.State
@@ -109,7 +113,7 @@ startState = let
             ("itos", TFunc TInt TStr)
         ]
     varMap = foldl (\m (n,t) -> Map.insert n t m) Map.empty libFuncs
-    in WorkerState 0 Set.empty Map.empty varMap Nothing
+    in WorkerState 0 Set.empty varMap Map.empty Nothing
 
 parseTypes :: AG.Program -> Either String Program
 parseTypes p = evalState (runExceptT (parseTypesM p)) startState
@@ -201,39 +205,25 @@ setPatternTypes p t = case p of
     AG.PIgnore -> return PIgnore
 
 initPatternTypes :: AG.Pattern -> WorkerMonad (Type, Pattern)
-initPatternTypes p = modify (setTempTypesMap Map.empty) >>
+initPatternTypes p = -- modify (setTempTypesMap Map.empty) >>
     initPatternTypesM p >>= \r -> 
-    modify (setTempTypesMap Map.empty) >> 
+    -- modify (setTempTypesMap Map.empty) >> 
     return r
 
 initPatternTypesM :: AG.Pattern -> WorkerMonad (Type, Pattern)
 initPatternTypesM p = case p of
     AG.PVar (AG.Ident v) -> 
         get >>= \s -> 
-        case Map.lookup v (getTempTypesMap s) of
+        case Map.lookup v $ getMap s of
             Just t -> return (t, PVar v)
             Nothing -> getNewType >>= \t -> 
-                modify (updateTempTypesMap (Map.insert v t)) >> 
+                modify (updateTypesMap $ Map.insert v t) >> 
                 return (t, PVar v)
     AG.PList l -> mapM initPatternTypesM l >>= \rs -> 
-        return (TTuple (map fst rs), PList (map snd rs))
+        return (TTuple (map fst rs), PList $ map snd rs)
     AG.PIgnore -> getNewType >>= \t -> 
         return (t, PIgnore)
 
-{-
-replacePolyType :: String -> Type -> WorkerMonad ()
-replacePolyType typename ttype = let
-    replacePolyTypeHelper :: Type -> Type
-    replacePolyTypeHelper context = case context of
-        TTuple l -> TTuple (map replacePolyTypeHelper l)
-        TPoly v -> if v /= typename then context else ttype
-        TVar _ -> context
-        TFunc from to -> TFunc (replacePolyTypeHelper from) (replacePolyTypeHelper to)
-        _ -> context
-    in modify (updateTypesMap (Map.map replacePolyTypeHelper))
--}
-
-type Substitution = [(String, Type)]
 
 checkAssignment :: Type -> Type -> WorkerMonad ()
 checkAssignment = undefined
@@ -241,16 +231,10 @@ checkAssignment = undefined
 occursInType :: String -> Type -> Bool
 occursInType typename t = case t of
     TVar s -> typename == s
---    TPoly s -> typename == s
     TFunc from to -> occursInType typename from && occursInType typename to
     TTuple l -> any (occursInType typename) l
     _ -> False
 
---checkAssignment :: Type -> Type -> WorkerMonad (Type,Type)
---checkAssignment varType targetType = modify (setTempTypesMap Map.empty) >>
---    checkAssignmentM varType targetType >>= \r ->
---    modify (setTempTypesMap Map.empty) >>
---    return r
 
 checkAssignmentM :: Type -> Type -> WorkerMonad (Type,Type)
 checkAssignmentM varType targetType =  case (varType, targetType) of
@@ -294,31 +278,27 @@ throwInvalidType :: Monad m => Type -> Type -> ExceptT String m a
 throwInvalidType expected got = throwE $ "Invalid type: expected " ++ show expected ++ " but got " ++ show got
 
 unify :: Type -> Type -> WorkerMonad Type
-unify lType rType = let 
-    helper :: Type -> Type -> WorkerMonad Type
-    helper l r = case (l, r) of
+unify lType rType = case (lType, rType) of
         (TInt, TInt) -> return TInt
         (TStr, TStr) -> return TStr
         (TBool, TBool) -> return TBool
         (TVoid, TVoid) -> return TVoid
-        (TTuple ll, TTuple rl) -> zipWithM helper ll rl >>= \res ->
+        (TTuple ll, TTuple rl) -> zipWithM unify ll rl >>= \res ->
             return $ TTuple res
-        (TFunc lfrom lto, TFunc rfrom rto) -> helper lfrom rfrom >>= \from ->
-            helper lto rto >>= \to ->
+        (TFunc lfrom lto, TFunc rfrom rto) -> unify lfrom rfrom >>= \from ->
+            unify lto rto >>= \to ->
             return $ TFunc from to
         (TVar a, _) -> get >>= \s ->
             case Map.lookup a $ getTempTypesMap s of
-                Just t -> unify t r
-                Nothing -> modify (updateTempTypesMap (Map.insert a r)) >>
-                    return r
+                Just t -> unify t rType
+                Nothing -> modify (updateTempTypesMap $ Map.insert a rType) >>
+                    return rType
         (_, TVar a) -> get >>= \s ->
             case Map.lookup a $ getTempTypesMap s of
-                Just t -> unify l t
-                Nothing -> modify (updateTempTypesMap (Map.insert a l)) >>
-                    return l
-        _ -> throwE $ "Types " ++ show l ++ " and " ++ show r ++ " aren't unifieble"
-    in modify (setTempTypesMap Map.empty) >> 
-        helper lType rType
+                Just t -> unify lType t
+                Nothing -> modify (updateTempTypesMap $ Map.insert a lType) >>
+                    return lType
+        _ -> throwE $ "Types " ++ show lType ++ " and " ++ show rType ++ " aren't unifieble"
 
 clearTempTypes :: WorkerMonad ()
 clearTempTypes = get >>= \s -> let
@@ -490,105 +470,27 @@ parseExpression = let
         AG.EStr v -> return $ TypedExpr TStr $ EStr v
         AG.ETrue -> return $ TypedExpr TBool ETrue
         AG.EFalse -> return $ TypedExpr TBool EFalse
-        AG.ECall funE params -> parseExpression funE >>= \funExpr -> case getType funExpr of
-            TFunc paramT retT -> mapM parseExpression params >>= \parsed -> let 
+        AG.ECall funE params -> parseExpression funE >>= 
+            liftExpr >>= \funExpr -> 
+            mapM parseExpression params >>= \parsed -> let 
                 paramsType = case map getType parsed of 
                     [] -> TVoid
                     [t] -> t
                     l -> TTuple l
-                in unify paramT paramsType >> 
-                    liftType retT >>= \retT' -> 
-                    clearTempTypes >>
-                    return (TypedExpr retT' $ ECall funExpr parsed)
-            _ -> throwE $ "Expected (* -> *) type, but got " ++ show (getType funExpr)
+                in case getType funExpr of
+                    TFunc paramT retT -> unify paramT paramsType >> 
+                            liftType retT >>= \retT' -> 
+                            clearTempTypes >>
+                            return (TypedExpr retT' $ ECall funExpr parsed)
+                    TVar a -> getNewType >>= \retT -> let 
+                        funcType = TFunc paramsType retT 
+                        in replaceVarType a (TFunc paramsType retT) >>
+                            return (TypedExpr retT $ ECall (TypedExpr funcType $ getExpr funExpr) parsed)
+                    _ -> throwE $ "Expected (* -> *) type, but got " ++ show (getType funExpr)
 
-{-
-parseExpression :: AG.Expr -> Type -> WorkerMonad TypedExpr
-parseExpression expr exprType = let 
-    parseIntOp :: AG.Expr -> AG.Expr -> IntegerOperation -> Type -> WorkerMonad TypedExpr
-    parseIntOp left right op exprType = case exprType of 
-        TInt -> parseExpression left TInt >>= \l ->
-            parseExpression right TInt >>= \r ->
-            return (TypedExpr TInt (EIntOp l r op))
-        _ -> throwE ("Invalid type. Expected int, but got " ++ show exprType)
-    in case expr of 
-    AG.EFunc pat stmt -> case exprType of
-        TFunc from to -> get >>= \s ->
-            registerPattern pat from >>= \(tcPat,patType) ->
-            parseStatement (AG.SBlock stmt) >>= \tcStmt -> case tcStmt of
-                (SBlock stmts) -> return (TypedExpr exprType (EFunc tcPat stmts))
-                _ -> return (TypedExpr exprType (EFunc tcPat [tcStmt]))
-        _ -> throwE ("Invalid type. Expected function, but got " ++ show exprType)
-    AG.EFuncE pat expr -> case exprType of
-        TFunc from to -> registerPattern pat from >>= \(tcPat,patType) ->
-            parseExpression expr to >>= \e ->
-            return (TypedExpr (TFunc patType (getType e)) (EFuncE tcPat e))
-        _ -> throwE ("Invalid type. Expected function, but got " ++ show exprType)
-    AG.ETuple (AG.TMany h t) -> case exprType of
-        TTuple typeList -> zipWithM parseExpression (h:t) typeList >>= \typedList ->
-            return (TypedExpr (TTuple (map getType typedList)) (ETuple typedList))
-        _ -> throwE ("Invalid type. Expected tuple, but got " ++ show exprType)
-    AG.EOr left right -> case exprType of 
-        TBool -> parseExpression left TBool >>= \l -> 
-            parseExpression right TBool >>= \r ->
-            return (TypedExpr TBool (EOr l r))
-        _ -> throwE ("Invalid type: expected bool, but got " ++ show exprType)
-    AG.EAnd left right -> case exprType of 
-        TBool -> parseExpression left TBool >>= \l -> 
-            parseExpression right TBool >>= \r ->
-            return (TypedExpr TBool (EAnd l r))
-        _ -> throwE ("Invalid type: expected bool, but got " ++ show exprType)
-    AG.ERel left oper right-> case exprType of 
-        TBool -> parseExpression left TInt >>= \l ->
-            parseExpression right TInt >>= \r ->
-            case fromAbsRelOp oper of 
-                Left comp -> return (TypedExpr TBool (ECompare l r comp))
-                Right eq -> return (TypedExpr TBool (EEqual l r eq))
-        _ -> throwE ("Invalid type: expected bool, but got " ++ show exprType)
-    AG.EAdd left op right -> case op of 
-        AG.OPlus -> parseIntOp left right OpAdd exprType
-        AG.OMinus -> parseIntOp left right OpSub exprType
-    AG.EMul left op right -> case op of 
-        AG.OMult -> parseIntOp left right OpMul exprType
-        AG.ODiv -> parseIntOp left right OpDiv exprType
-        AG.OMod -> parseIntOp left right OpMod exprType
-    AG.EPow left op right -> case op of 
-        AG.OPow -> parseIntOp left right OpPow exprType
-    AG.ENeg inner -> case exprType of
-        TBool -> parseExpression inner TBool >>= \res ->
-            return (TypedExpr TBool (ENeg res))
-        _ -> throwE ("Invalid type: expected bool, but got " ++ show exprType)
-    AG.EVar (AG.Ident name) -> get >>= \s -> 
-        case Map.lookup name (getMap s) of 
-            Just t -> if t == exprType 
-                then return (TypedExpr t (EVar name))
-                else throwE ("Invalid type. Expected " ++ show exprType ++ ", but got " ++ show t)
-            Nothing -> throwE ("Usage of undefined variable " ++ name) 
-    AG.EInt v -> case exprType of
-        TInt -> return (TypedExpr TInt (EInt v))
-        _ -> throwE ("Invalid type: expected int, but got " ++ show exprType)
-    AG.EStr v -> case exprType of 
-        TStr -> return (TypedExpr TStr (EStr v))
-        _ -> throwE ("Invalid type: expected str, but got " ++ show exprType)
-    AG.ETrue -> case exprType of 
-        TBool -> return (TypedExpr TBool ETrue)
-        _ -> throwE ("Invalid type: expected bool, but got " ++ show exprType)
-    AG.EFalse -> case exprType of 
-        TBool -> return (TypedExpr TBool EFalse)
-        _ -> throwE ("Invalid type: expected bool, but got " ++ show exprType)
-    AG.ECall funExpr params -> mapM (`parseExpression` TInt) params >>= \parsedParams -> let
-        paramTypes = map getType parsedParams
-        funArgType = case paramTypes of 
-            [] -> TVoid
-            [t] -> t
-            _ -> TTuple paramTypes
-        in parseExpression funExpr (TFunc funArgType exprType) >>= \f ->
-            return (TypedExpr exprType (ECall f parsedParams))
--}          
-            
 
 parseTypesM :: AG.Program -> WorkerMonad Program
-parseTypesM (AG.Prog stmts) = mapM parseStatement stmts
+parseTypesM (AG.Prog stmts) =  mapM parseStatement stmts
 
 parseStatement :: AG.Stmt -> WorkerMonad Statement
 parseStatement stmt = case stmt of
@@ -604,34 +506,37 @@ parseStatement stmt = case stmt of
     AG.SExpr e -> SExpr <$> parseExpression e
     AG.SSkip -> return SSkip
 
-parsePattern :: AG.Pattern -> Maybe AG.Type -> WorkerMonad (Type, Pattern)
-parsePattern pat mType = case mType of
-    Just tp -> 
-        fromParserType tp >>= \t ->
-        setPatternTypes pat t >>= \p ->
-        return (t,p)
-    Nothing -> initPatternTypes pat
+parsePattern :: AG.Pattern -> WorkerMonad (Type, Pattern)
+parsePattern = initPatternTypes
    
 
 parseLet :: AG.Pattern -> AG.Expr -> Maybe AG.Type -> WorkerMonad Statement
-parseLet pat expr mType = get >>= \s ->
-    parsePattern pat mType >>= \(tcType, tcPat) ->
-    parseExpression expr >>= \tExpr ->
-    modify (setVarTypes (getVarTypes s)) >>
-    return (SLet tcPat tExpr)
+parseLet pat expr _ = let 
+    bindPatternExpr :: Pattern -> Type -> WorkerMonad ()
+    bindPatternExpr patt exprType = liftType exprType >>= \t -> 
+        case (patt,t) of
+            (PVar v, _) -> modify (updateTypesMap $ Map.insert v exprType)
+            (PIgnore, _) -> return ()
+            (PList list, TTuple tuple) -> zipWithM_ bindPatternExpr list tuple
+            (PList list, TVar a) -> mapM_ (\p -> getNewType >>= \t -> bindPatternExpr p t) list
+            _ -> throwE ""
+    in parsePattern pat >>= \(_ , tcPat) ->
+        parseExpression expr >>= \tExpr ->
+        bindPatternExpr tcPat (getType tExpr) >>
+        return (SLet tcPat tExpr)
 
 parseIf :: AG.Expr -> AG.Stmt -> Maybe AG.Stmt -> WorkerMonad Statement
 parseIf eIf sThen msElse = parseExpression eIf >>= \teIf ->
     parseStatement sThen >>= \tcThen ->
     case msElse of
         Just sElse -> parseStatement sElse >>= \tcElse -> 
-            return (SIf teIf tcThen tcElse)
-        Nothing -> return (SIf teIf tcThen SSkip)
+            return $ SIf teIf tcThen tcElse
+        Nothing -> return $ SIf teIf tcThen SSkip
 
 parseWhile :: AG.Expr -> AG.Stmt -> WorkerMonad Statement
 parseWhile ePred sHandle = parseExpression ePred >>= \tePred ->
     parseStatement sHandle >>= \tcHandle ->
-    return (SWhile tePred tcHandle)
+    return $ SWhile tePred tcHandle
 
 parseFor :: String -> AG.Expr -> AG.Expr -> AG.Stmt -> WorkerMonad Statement
 parseFor var from to handle = let 
@@ -646,19 +551,22 @@ parseBlock :: [AG.Stmt] -> WorkerMonad Statement
 parseBlock stmts = get >>= \oldState ->
     mapM parseStatement stmts >>= \tcStmts ->
     get >>= \newState ->
-    foldM_ (\_ k -> if Map.member k (getMap oldState) then return () else modify (updateTypesMap (Map.delete k))) () (Map.keys (getMap newState)) >>
-    foldM_ (\_ t -> if Set.member t (getVarTypes oldState) then return () else modify (updateVarTypes (Set.delete t))) () (Set.toList (getVarTypes newState)) >>
+    foldM_ (\_ k -> if Map.member k $ getMap oldState then return () else modify $ updateTypesMap $ Map.delete k) () (Map.keys $ getMap newState) >>
+    foldM_ (\_ t -> if Set.member t $ getVarTypes oldState then return () else modify $ updateVarTypes $ Set.delete t) () (Set.toList $ getVarTypes newState) >>
     return (SBlock tcStmts)
 
 parseRet :: Maybe AG.Expr -> WorkerMonad Statement
 parseRet mExpr = get >>= \s ->
     case getCurrFunType s of
         Just t -> case mExpr of
-            Just expr -> getRetType t >>= \retT -> 
-                parseExpression expr >>= \typedExpr -> 
-                checkAssignment (getType typedExpr) retT >>
-                return (SRet (Just typedExpr))
-            Nothing -> getRetType t >>= \retT -> 
-                checkAssignment TVoid retT >>
+            Just expr -> getRetType t >>= 
+                liftType >>= \retT -> 
+                parseExpression expr >>= 
+                liftExpr >>= \typedExpr -> 
+                unify (getType typedExpr) retT >>
+                return (SRet $ Just typedExpr)
+            Nothing -> getRetType t >>= 
+                liftType >>= \retT -> 
+                unify TVoid retT >>
                 return (SRet Nothing) 
         Nothing -> throwE "Invalid return statement outside a function"

@@ -129,6 +129,7 @@ runExpression e = case getExpr e of
                 OpMul -> (*)
                 OpDiv -> div
                 OpPow -> (^)
+                OpMod -> mod
         in case (varValue leftRes, varValue rightRes) of
             (VInt l, VInt r) -> return (Variable (VInt (operFun l r)) (getType e))
             _ -> throwE "Invalid type of integer operation"
