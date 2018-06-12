@@ -273,10 +273,13 @@ registerPattern = \case
             Nothing -> getNewType >>= \t ->
                 modify (updateTypesMap (Map.insert v t)) >>
                 return (PVar v,t)
-    AG.PList l -> mapM registerPattern l >>= \resList -> let 
-        f = map fst resList
-        s = map snd resList
-        in return (PList f, TTuple s)
+    AG.PList l -> case l of 
+        [] -> return (PList [], TVoid)
+        [t] -> registerPattern t
+        _ ->mapM registerPattern l >>= \resList -> let 
+            f = map fst resList
+            s = map snd resList
+            in return (PList f, TTuple s)
     AG.PIgnore -> getNewType >>= \t -> return (PIgnore,t)
     
 throwInvalidType :: Monad m => Type -> Type -> ExceptT String m a

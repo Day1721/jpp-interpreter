@@ -7,3 +7,16 @@ New (updated, removed most of conflicts) grammar can be found in file "grammar.c
 
 Current version still don't work well, mostly because Type Checker still lacks 
 polymorphism and type interference handling. In next version I'll fix this.
+
+
+
+New, updated version of z-lang interpreter
+Building:
+make
+
+Example programs can be found in "examples" directory
+
+Current compiler little differs from beginning. While developing it I've observed that 
+type annotations for this language is mostly useless and annoying because of it's simple type 
+system (no records, classes, derivation, etc). So for now my interpreter ignores any type 
+annotations made in code, just use most general type

@@ -12,15 +12,13 @@ let compose /*: (b->c,a->b)->(a->c) */
 
 // I/O handling
 print(hello);               // Print string on screen
+print("\n");
 //readc(char);                // Reads char from input, stores in "new" var {char}, returns bool
 //readl(line);                // Reads line from input and stores in "new" var {line}, returns bool
 
 // Some statemens
 if (i > 0) id(i);                   // If
 if (i > 0) id(i); else id(i+1);     // If else
-while (readc(c)) {                  // While
-    print(strConcat("Saw ", c));
-}
 for (i = 0 to 10) print(itos(i));   // For
 
 let asInt : int = stoi("1");        // String to int
@@ -32,10 +30,15 @@ let fib = \n => {                   // recursion
 };
 
 let sqr5 = (\n => n*n)(5);          // call inline lambda
+print(itos(sqr5));
+print("\n");
 
-let (fst,snd) = t;                  // tuple unpacking
+let (fst,snd) = tuple;              // tuple unpacking
 let triple = (1,2,3);
 let (fst,_,_) = triple;             // some may be ignored
+
+print(itos(fst));
+print("\n");
 
 //features:
 //  - types: int | bool | string | tuple | function

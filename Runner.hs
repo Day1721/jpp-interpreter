@@ -6,8 +6,6 @@ import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 
-import Debug.Trace
-
 import qualified Data.Map as Map
 import qualified Text.Read as Read
 
@@ -144,7 +142,7 @@ runExpression e = ask >>= \s -> case getExpr e of
         Just v -> return v
         Nothing -> throwE $ "use of uninitialized variable " ++ varName
     EInt i -> return $ Variable (VInt i) $ getType e
-    EStr s -> return $ Variable (VStr s) $ getType e
+    EStr str -> return $ Variable (VStr str) $ getType e
     ETrue -> return $ Variable (VBool True) $ getType e
     EFalse -> return $ Variable (VBool False) $ getType e
     ECall fun params -> mapM runExpression params >>= \runableParams ->
@@ -158,8 +156,7 @@ runExpression e = ask >>= \s -> case getExpr e of
             in case varValue f of
                 VFunc pars stmt vars -> local (addPatVariables pars runableParams . const vars) (runStatements stmt) >>= \case
                     ReturnedVal v -> return v
-                    Returned -> return (Variable VVoid TVoid)
-                    NoReturn -> throwE "No return from function"
+                    _ -> return (Variable VVoid TVoid)
                 VLibFunc libFunc -> libFunc runableParams
                 _ -> throwE "given variable is not callable"
 
@@ -178,6 +175,7 @@ runStatements (h:t) = let
     runStatement = \case
         SLet pat expr -> runExpression expr >>= \calcExp ->
             return (NoReturn, addVariables pat calcExp)
+            return (NoReturn, addVariables pat p)
         SIf ifExpr th el -> runExpression ifExpr >>= \ifVal -> 
             case varValue ifVal of
                 VBool b -> if b then runStatement th else runStatement el
@@ -198,10 +196,10 @@ runStatements (h:t) = let
                     properFor beg = runExpression end >>= \e -> 
                         case varValue e of
                             VInt j -> if beg > j then runStatement SSkip 
-                                else let varI = Variable (VInt i) TInt
+                                else let varI = Variable (VInt beg) TInt
                                     in local (updateDeclVariables $ Map.insert var varI) (runStatement handler) >>= \(res, _) ->
                                         case res of 
-                                            NoReturn -> properFor $ i+1
+                                            NoReturn -> properFor $ beg+1
                                             _ -> return (res,id)
                             _ -> throwE "invalid type"
                     in properFor i
