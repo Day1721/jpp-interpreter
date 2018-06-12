@@ -10,8 +10,6 @@ import qualified Data.Set as Set
 import qualified Data.List as List
 import Data.Maybe
 
-import Debug.Trace
-
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Trans.Except
@@ -35,6 +33,13 @@ instance Show Type where
         TFunc from to -> show from ++ " -> " ++ show to
         TVar v -> v
         TVoid -> "()"
+
+showType :: Type -> WorkerMonad String
+showType t = show <$> deepLiftType t
+
+showExpr :: TypedExpr -> WorkerMonad String
+showExpr (TypedExpr t e) = showType t >>= \st -> 
+    return $ "TypedExpr { getType = " ++ st ++", getExpr = " ++ show e ++ "}"
 
 type Program = [Statement];
 data Statement
@@ -320,6 +325,17 @@ liftType t = case t of
 
 liftExpr :: TypedExpr -> WorkerMonad TypedExpr
 liftExpr (TypedExpr t e) = liftType t >>= \tv -> return $ TypedExpr tv e
+
+deepLiftType :: Type -> WorkerMonad Type
+deepLiftType t = liftType t >>= \lt -> 
+    case lt of
+        TFunc from to -> deepLiftType from >>= \lfrom ->
+            deepLiftType to >>= \lto ->
+            return $ TFunc lfrom lto
+        TTuple list -> mapM deepLiftType list >>= \llist ->
+            return $ TTuple llist
+        _ -> return lt
+    
 
 parseExpression :: AG.Expr -> WorkerMonad TypedExpr
 parseExpression = let 
