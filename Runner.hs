@@ -175,7 +175,6 @@ runStatements (h:t) = let
     runStatement = \case
         SLet pat expr -> runExpression expr >>= \calcExp ->
             return (NoReturn, addVariables pat calcExp)
-            return (NoReturn, addVariables pat p)
         SIf ifExpr th el -> runExpression ifExpr >>= \ifVal -> 
             case varValue ifVal of
                 VBool b -> if b then runStatement th else runStatement el
